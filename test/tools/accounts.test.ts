@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AppDatabase } from "../../src/db/index.js";
 import { accounts as accountsTable } from "../../src/db/schema.js";
-import {
-  getBalances,
-  listAccounts,
-} from "../../src/tools/accounts.js";
+import { getBalances, listAccounts } from "../../src/tools/accounts.js";
 import { createTestDatabase, disposeTestDatabase } from "../db/setup.js";
 
 const SYNCED_AT = "2026-05-14T02:00:00.000Z";

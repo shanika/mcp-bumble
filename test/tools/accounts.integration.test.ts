@@ -24,7 +24,8 @@ async function createHarness(db: AppDatabase): Promise<Harness> {
   const server = new McpServer({ name: "test-bumble", version: "0.0.0" });
   registerAccountTools(server, db);
 
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
 
   const client = new Client({ name: "test-client", version: "0.0.0" });

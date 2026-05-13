@@ -62,9 +62,10 @@ export function getBalances(
 ): BalanceSummary[] {
   const needle = options.accountNameFilter?.trim().toLowerCase() ?? "";
   const rows = db.select().from(accountsTable).all();
-  const matched = needle.length === 0
-    ? rows
-    : rows.filter((row) => row.name.toLowerCase().includes(needle));
+  const matched =
+    needle.length === 0
+      ? rows
+      : rows.filter((row) => row.name.toLowerCase().includes(needle));
 
   return matched.map((row) => ({
     accountName: row.name,
@@ -75,10 +76,7 @@ export function getBalances(
 }
 
 /** Registers `list_accounts` + `get_balances` on the given McpServer. */
-export function registerAccountTools(
-  server: McpServer,
-  db: AppDatabase,
-): void {
+export function registerAccountTools(server: McpServer, db: AppDatabase): void {
   server.registerTool(
     "list_accounts",
     {

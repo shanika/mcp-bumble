@@ -4,6 +4,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { closeDatabase, openDatabase } from "./db/index.js";
 import type { AppDatabase } from "./db/index.js";
 import { registerAccountTools } from "./tools/accounts.js";
+import { registerCategoryTools } from "./tools/categories.js";
+import { registerRuleTools } from "./tools/rules.js";
 import { registerTransactionTools } from "./tools/transactions.js";
 
 const SERVER_NAME = "mcp-bumble";
@@ -17,6 +19,8 @@ export function createServer(db: AppDatabase): McpServer {
   });
   registerAccountTools(server, db);
   registerTransactionTools(server, db);
+  registerCategoryTools(server, db);
+  registerRuleTools(server, db);
   return server;
 }
 

@@ -17,7 +17,10 @@ import {
   type Transaction as DbTransaction,
 } from "../db/schema.js";
 import { newSuggestionId, newSyncRunId, newTransferId } from "../lib/ids.js";
+import { deriveMerchantKey, findMatchingRule } from "../lib/rules.js";
 import { BumbleAkahuClient } from "./client.js";
+
+export { deriveMerchantKey };
 
 const TRANSACTIONS_STATE_KEY = "transactions";
 const TRANSFER_TYPES = new Set([
@@ -71,18 +74,6 @@ function extractEnriched(tx: AkahuTransaction): EnrichedTxFields {
     akahuCategory: enriched.category?.name ?? null,
     metaOtherAccount: enriched.meta?.other_account ?? null,
   };
-}
-
-/** Normalised merchant key for rule matching, mirroring spec §2.7. */
-export function deriveMerchantKey(
-  merchantName: string | null | undefined,
-  description: string,
-): string {
-  if (merchantName && merchantName.trim().length > 0) {
-    return merchantName.trim().toUpperCase();
-  }
-  const words = description.trim().split(/\s+/).slice(0, 2).join(" ");
-  return words.toUpperCase();
 }
 
 function upsertAccount(
@@ -402,11 +393,6 @@ function applyRules(
   const rules = db.select().from(categorizationRules).all();
   if (rules.length === 0) return 0;
 
-  // Sort rules longest-pattern-first so more specific patterns win.
-  const sortedRules = [...rules].sort(
-    (a, b) => b.merchantPattern.length - a.merchantPattern.length,
-  );
-
   let categorized = 0;
 
   for (const tx of candidates) {
@@ -424,9 +410,7 @@ function applyRules(
     const merchantKey = deriveMerchantKey(tx.merchantName, tx.description);
     if (!merchantKey) continue;
 
-    const match = sortedRules.find((rule) =>
-      merchantKey.startsWith(rule.merchantPattern.toUpperCase()),
-    );
+    const match = findMatchingRule(merchantKey, rules);
     if (!match) continue;
 
     const assignment: NewTransactionCategory = {
