@@ -44,8 +44,13 @@ export function openDatabase(options: OpenDatabaseOptions = {}): AppDatabase {
   return db;
 }
 
-export function runMigrations(db: AppDatabase, migrationsFolder?: string): void {
-  migrate(db, { migrationsFolder: migrationsFolder ?? resolveMigrationsFolder() });
+export function runMigrations(
+  db: AppDatabase,
+  migrationsFolder?: string,
+): void {
+  migrate(db, {
+    migrationsFolder: migrationsFolder ?? resolveMigrationsFolder(),
+  });
 }
 
 export function closeDatabase(db: AppDatabase): void {

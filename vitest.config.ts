@@ -15,12 +15,8 @@ export default defineConfig({
       exclude: [
         "src/**/*.d.ts",
         "src/index.ts",
-        "src/cli.ts",
         "src/server.ts",
         "src/db/migrate.ts",
-        "src/akahu/client.ts",
-        "src/akahu/sync.ts",
-        "src/lib/cache.ts",
         "src/lib/rules.ts",
         "src/lib/transfers.ts",
         "src/tools/accounts.ts",

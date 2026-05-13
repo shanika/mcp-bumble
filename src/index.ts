@@ -4,7 +4,8 @@ import { runServer } from "./server.js";
 const subcommand = process.argv[2];
 
 if (subcommand === "sync") {
-  await runCli(process.argv.slice(2));
+  const code = await runCli(process.argv.slice(2));
+  process.exit(code);
 } else {
   await runServer();
 }

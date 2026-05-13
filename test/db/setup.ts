@@ -1,4 +1,8 @@
-import { closeDatabase, openDatabase, type AppDatabase } from "../../src/db/index.js";
+import {
+  closeDatabase,
+  openDatabase,
+  type AppDatabase,
+} from "../../src/db/index.js";
 
 /** Open a fresh in-memory SQLite DB with all migrations applied. */
 export function createTestDatabase(): AppDatabase {

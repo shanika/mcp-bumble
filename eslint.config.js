@@ -4,7 +4,12 @@ import tsparser from "@typescript-eslint/parser";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "coverage/**", "src/db/migrations/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "src/db/migrations/**",
+    ],
   },
   js.configs.recommended,
   {

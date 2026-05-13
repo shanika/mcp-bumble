@@ -17,12 +17,15 @@ describe("id helpers", () => {
     ["run_", newSyncRunId],
   ];
 
-  it.each(cases)("%s prefix is applied and ids are unique", (prefix, factory) => {
-    const a = factory();
-    const b = factory();
-    expect(a.startsWith(prefix)).toBe(true);
-    expect(b.startsWith(prefix)).toBe(true);
-    expect(a).not.toBe(b);
-    expect(a.length).toBeGreaterThan(prefix.length + 8);
-  });
+  it.each(cases)(
+    "%s prefix is applied and ids are unique",
+    (prefix, factory) => {
+      const a = factory();
+      const b = factory();
+      expect(a.startsWith(prefix)).toBe(true);
+      expect(b.startsWith(prefix)).toBe(true);
+      expect(a).not.toBe(b);
+      expect(a.length).toBeGreaterThan(prefix.length + 8);
+    },
+  );
 });

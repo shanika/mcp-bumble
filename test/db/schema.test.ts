@@ -64,15 +64,18 @@ describe("schema migrations", () => {
 
   it("enforces foreign keys (transactions → accounts)", () => {
     expect(() =>
-      db.insert(schema.transactions).values({
-        id: "trans_orphan",
-        accountId: "acc_missing",
-        date: NOW,
-        description: "x",
-        amount: -1,
-        type: "DEBIT",
-        syncedAt: NOW,
-      }).run(),
+      db
+        .insert(schema.transactions)
+        .values({
+          id: "trans_orphan",
+          accountId: "acc_missing",
+          date: NOW,
+          description: "x",
+          amount: -1,
+          type: "DEBIT",
+          syncedAt: NOW,
+        })
+        .run(),
     ).toThrow(/FOREIGN KEY/i);
   });
 
@@ -100,7 +103,13 @@ describe("schema migrations", () => {
 
   it("supports CRUD on transactions with index hits", () => {
     db.insert(schema.accounts)
-      .values({ id: "acc_1", name: "A", type: "CHECKING", institution: "ANZ", syncedAt: NOW })
+      .values({
+        id: "acc_1",
+        name: "A",
+        type: "CHECKING",
+        institution: "ANZ",
+        syncedAt: NOW,
+      })
       .run();
 
     db.insert(schema.transactions)
@@ -153,7 +162,13 @@ describe("schema migrations", () => {
   it("supports CRUD on transaction_categories (one per transaction)", () => {
     const catId = newCategoryId();
     db.insert(schema.accounts)
-      .values({ id: "acc_1", name: "A", type: "CHECKING", institution: "ANZ", syncedAt: NOW })
+      .values({
+        id: "acc_1",
+        name: "A",
+        type: "CHECKING",
+        institution: "ANZ",
+        syncedAt: NOW,
+      })
       .run();
     db.insert(schema.transactions)
       .values({
@@ -166,7 +181,9 @@ describe("schema migrations", () => {
         syncedAt: NOW,
       })
       .run();
-    db.insert(schema.categories).values({ id: catId, name: "Cat", createdAt: NOW }).run();
+    db.insert(schema.categories)
+      .values({ id: catId, name: "Cat", createdAt: NOW })
+      .run();
     db.insert(schema.transactionCategories)
       .values({
         transactionId: "trans_1",
@@ -191,7 +208,9 @@ describe("schema migrations", () => {
 
   it("supports CRUD on categorization_rules with unique merchant_pattern", () => {
     const catId = newCategoryId();
-    db.insert(schema.categories).values({ id: catId, name: "Cat", createdAt: NOW }).run();
+    db.insert(schema.categories)
+      .values({ id: catId, name: "Cat", createdAt: NOW })
+      .run();
 
     db.insert(schema.categorizationRules)
       .values({
@@ -219,7 +238,13 @@ describe("schema migrations", () => {
 
   it("supports CRUD on internal_transfers with unique debit", () => {
     db.insert(schema.accounts)
-      .values({ id: "acc_1", name: "A", type: "CHECKING", institution: "ANZ", syncedAt: NOW })
+      .values({
+        id: "acc_1",
+        name: "A",
+        type: "CHECKING",
+        institution: "ANZ",
+        syncedAt: NOW,
+      })
       .run();
     db.insert(schema.transactions)
       .values({
@@ -257,7 +282,13 @@ describe("schema migrations", () => {
 
   it("supports CRUD on internal_transfer_suggestions with pair uniqueness", () => {
     db.insert(schema.accounts)
-      .values({ id: "acc_1", name: "A", type: "CHECKING", institution: "ANZ", syncedAt: NOW })
+      .values({
+        id: "acc_1",
+        name: "A",
+        type: "CHECKING",
+        institution: "ANZ",
+        syncedAt: NOW,
+      })
       .run();
     db.insert(schema.transactions)
       .values([
