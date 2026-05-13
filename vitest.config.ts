@@ -19,7 +19,6 @@ export default defineConfig({
         "src/db/migrate.ts",
         "src/lib/rules.ts",
         "src/lib/transfers.ts",
-        "src/tools/accounts.ts",
         "src/tools/categories.ts",
         "src/tools/rules.ts",
         "src/tools/transactions.ts",
