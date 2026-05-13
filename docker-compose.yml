@@ -1,0 +1,13 @@
+services:
+  bumble-mcp:
+    build: .
+    volumes:
+      - bumble-data:/data
+    environment:
+      - AKAHU_APP_TOKEN=${AKAHU_APP_TOKEN}
+      - AKAHU_USER_TOKEN=${AKAHU_USER_TOKEN}
+      - DB_PATH=/data/bumble.db
+    stdin_open: true
+
+volumes:
+  bumble-data:

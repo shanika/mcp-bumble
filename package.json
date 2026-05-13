@@ -1,0 +1,65 @@
+{
+  "name": "mcp-bumble",
+  "version": "0.0.0",
+  "description": "MCP server for NZ bank data via Akahu — transaction categorization & balance tracking",
+  "license": "MIT",
+  "author": "shanika",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shanika/mcp-bumble.git"
+  },
+  "homepage": "https://github.com/shanika/mcp-bumble#readme",
+  "bugs": {
+    "url": "https://github.com/shanika/mcp-bumble/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "mcp-bumble": "./dist/index.js",
+    "bumble": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "sync": "node dist/index.js sync",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md}\"",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node dist/db/migrate.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "akahu": "^1.10.0",
+    "better-sqlite3": "^11.3.0",
+    "drizzle-orm": "^0.36.0",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "@typescript-eslint/parser": "^8.8.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "drizzle-kit": "^0.27.0",
+    "eslint": "^9.12.0",
+    "prettier": "^3.3.3",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
