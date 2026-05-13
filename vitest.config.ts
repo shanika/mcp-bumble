@@ -21,7 +21,6 @@ export default defineConfig({
         "src/lib/transfers.ts",
         "src/tools/categories.ts",
         "src/tools/rules.ts",
-        "src/tools/transactions.ts",
         "src/tools/transfers.ts",
       ],
       thresholds: {
