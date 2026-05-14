@@ -10,7 +10,7 @@ import { registerTransactionTools } from "./tools/transactions.js";
 import { registerTransferTools } from "./tools/transfers.js";
 
 const SERVER_NAME = "mcp-bumble";
-const SERVER_VERSION = "0.0.0";
+const SERVER_VERSION = "0.1.0";
 
 /** Builds a fully-wired McpServer with every Bumble tool registered. */
 export function createServer(db: AppDatabase): McpServer {

@@ -1,6 +1,6 @@
 {
   "name": "mcp-bumble",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "MCP server for NZ bank data via Akahu — transaction categorization & balance tracking",
   "license": "MIT",
   "author": "shanika",

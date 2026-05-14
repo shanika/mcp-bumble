@@ -1,13 +1,30 @@
+# Bumble: nightly Akahu sync as a long-running container.
+#
+# Use cases:
+#   docker compose up -d              # start the nightly sync daemon (cron)
+#   docker compose run --rm bumble sync --now   # one-shot sync
+#   docker compose run --rm -i bumble mcp       # MCP STDIO server for a client
+#
+# MCP clients (Claude Desktop) generally prefer `npx mcp-bumble` directly; the
+# Docker image is mainly for unattended nightly sync.
+
 services:
-  bumble-mcp:
+  bumble:
     build: .
+    image: mcp-bumble:latest
+    command: ["cron"]
+    restart: unless-stopped
     volumes:
       - bumble-data:/data
+      - bumble-logs:/var/log/bumble
     environment:
-      - AKAHU_APP_TOKEN=${AKAHU_APP_TOKEN}
-      - AKAHU_USER_TOKEN=${AKAHU_USER_TOKEN}
-      - DB_PATH=/data/bumble.db
-    stdin_open: true
+      AKAHU_APP_TOKEN: ${AKAHU_APP_TOKEN}
+      AKAHU_USER_TOKEN: ${AKAHU_USER_TOKEN}
+      DB_PATH: /data/bumble.db
+      SYNC_CRON_HOUR: ${SYNC_CRON_HOUR:-2}
+      SYNC_CRON_MINUTE: ${SYNC_CRON_MINUTE:-0}
+      SYNC_TZ: ${SYNC_TZ:-Pacific/Auckland}
 
 volumes:
   bumble-data:
+  bumble-logs:
