@@ -18,10 +18,8 @@ export default defineConfig({
   // Ship the Drizzle migration files next to dist/index.js so runMigrations()
   // can find them at runtime — resolveMigrationsFolder() looks in <moduleDir>/migrations.
   onSuccess: async () => {
-    cpSync(
-      path.resolve("src/db/migrations"),
-      path.resolve("dist/migrations"),
-      { recursive: true },
-    );
+    cpSync(path.resolve("src/db/migrations"), path.resolve("dist/migrations"), {
+      recursive: true,
+    });
   },
 });

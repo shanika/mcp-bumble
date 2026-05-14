@@ -277,12 +277,7 @@ describe("runPass1 — table-driven (§7)", () => {
       amount: -300,
       metaOtherAccount: "99-9999-9999999-99",
     });
-    const result = runPass1(
-      db,
-      ["stranger"],
-      buildAccountIndexFromDb(db),
-      NOW,
-    );
+    const result = runPass1(db, ["stranger"], buildAccountIndexFromDb(db), NOW);
     expect(result.marked).toBe(0);
     expect(db.select().from(internalTransfers).all()).toHaveLength(0);
   });
@@ -461,9 +456,7 @@ describe("runPass2 — table-driven (§7)", () => {
       date: "2026-05-11",
       amount: 499.5,
     });
-    expect(
-      runPass2(db, ["debit", "credit_partial"], new Set(), NOW),
-    ).toBe(0);
+    expect(runPass2(db, ["debit", "credit_partial"], new Set(), NOW)).toBe(0);
   });
 
   it("filters by type — same amount on the same day with non-transfer types does not match", () => {
@@ -481,9 +474,7 @@ describe("runPass2 — table-driven (§7)", () => {
       amount: 50,
       type: "EFTPOS", // <-- not a transfer type
     });
-    expect(
-      runPass2(db, ["savings_xfer", "groceries"], new Set(), NOW),
-    ).toBe(0);
+    expect(runPass2(db, ["savings_xfer", "groceries"], new Set(), NOW)).toBe(0);
   });
 
   it("detects round-trip transfers as two separate pairs", () => {
@@ -702,9 +693,7 @@ describe("isAlreadyMarkedInternal / hasPendingSuggestion", () => {
     expect(hasPendingSuggestion(db, "t1")).toBe(true);
     expect(hasPendingSuggestion(db, "t2")).toBe(true);
 
-    db.update(internalTransferSuggestions)
-      .set({ status: "confirmed" })
-      .run();
+    db.update(internalTransferSuggestions).set({ status: "confirmed" }).run();
     expect(hasPendingSuggestion(db, "t1")).toBe(false);
   });
 });
