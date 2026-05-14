@@ -7,6 +7,7 @@ import { registerAccountTools } from "./tools/accounts.js";
 import { registerCategoryTools } from "./tools/categories.js";
 import { registerRuleTools } from "./tools/rules.js";
 import { registerTransactionTools } from "./tools/transactions.js";
+import { registerTransferTools } from "./tools/transfers.js";
 
 const SERVER_NAME = "mcp-bumble";
 const SERVER_VERSION = "0.0.0";
@@ -21,6 +22,7 @@ export function createServer(db: AppDatabase): McpServer {
   registerTransactionTools(server, db);
   registerCategoryTools(server, db);
   registerRuleTools(server, db);
+  registerTransferTools(server, db);
   return server;
 }
 

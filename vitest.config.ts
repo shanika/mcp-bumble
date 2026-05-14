@@ -18,10 +18,8 @@ export default defineConfig({
         "src/server.ts",
         "src/db/migrate.ts",
         "src/lib/rules.ts",
-        "src/lib/transfers.ts",
         "src/tools/categories.ts",
         "src/tools/rules.ts",
-        "src/tools/transfers.ts",
       ],
       thresholds: {
         lines: 80,

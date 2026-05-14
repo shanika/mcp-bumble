@@ -1,35 +1,32 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Account, Transaction as AkahuTransaction } from "akahu";
 
 import type { AppDatabase } from "../db/index.js";
 import {
   accounts as accountsTable,
   categorizationRules,
-  internalTransfers,
-  internalTransferSuggestions,
   syncRuns,
   syncState,
   transactionCategories,
   transactions as transactionsTable,
-  type NewInternalTransfer,
-  type NewInternalTransferSuggestion,
   type NewTransactionCategory,
   type Transaction as DbTransaction,
 } from "../db/schema.js";
-import { newSuggestionId, newSyncRunId, newTransferId } from "../lib/ids.js";
+import { newSyncRunId } from "../lib/ids.js";
 import { deriveMerchantKey, findMatchingRule } from "../lib/rules.js";
+import {
+  buildAccountIndex,
+  hasPendingSuggestion,
+  isAlreadyMarkedInternal,
+  runPass1,
+  runPass2,
+  type AccountIndex,
+} from "../lib/transfers.js";
 import { BumbleAkahuClient } from "./client.js";
 
 export { deriveMerchantKey };
 
 const TRANSACTIONS_STATE_KEY = "transactions";
-const TRANSFER_TYPES = new Set([
-  "TRANSFER",
-  "PAYMENT",
-  "DIRECT CREDIT",
-  "DIRECT DEBIT",
-]);
-const PASS2_WINDOW_MS = 48 * 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface RunSyncOptions {
@@ -174,202 +171,13 @@ function upsertTransactions(
   return { inserted, rowIds: txs.map((t) => t._id) };
 }
 
-function isAlreadyMarkedInternal(db: AppDatabase, txId: string): boolean {
-  const debitRow = db
-    .select({ id: internalTransfers.id })
-    .from(internalTransfers)
-    .where(eq(internalTransfers.debitTransactionId, txId))
-    .all();
-  if (debitRow.length > 0) return true;
-  const creditRow = db
-    .select({ id: internalTransfers.id })
-    .from(internalTransfers)
-    .where(eq(internalTransfers.creditTransactionId, txId))
-    .all();
-  return creditRow.length > 0;
-}
-
-function hasPendingSuggestion(db: AppDatabase, txId: string): boolean {
-  const rows = db
-    .select({ id: internalTransferSuggestions.id })
-    .from(internalTransferSuggestions)
-    .where(
-      sql`(${internalTransferSuggestions.debitTransactionId} = ${txId} OR ${internalTransferSuggestions.creditTransactionId} = ${txId}) AND ${internalTransferSuggestions.status} = 'pending'`,
-    )
-    .all();
-  return rows.length > 0;
-}
-
-interface AccountIndex {
-  byId: Map<string, Account>;
-  byFormatted: Map<string, Account>;
-}
-
-function indexAccounts(accs: Account[]): AccountIndex {
-  const byId = new Map<string, Account>();
-  const byFormatted = new Map<string, Account>();
-  for (const acc of accs) {
-    byId.set(acc._id, acc);
-    if (acc.formatted_account) {
-      byFormatted.set(acc.formatted_account, acc);
-    }
-  }
-  return { byId, byFormatted };
-}
-
-interface RunPass1Result {
-  marked: number;
-  matchedTxIds: Set<string>;
-}
-
-/**
- * Pass 1 (spec §7): meta.other_account → known formatted_account in our
- * account index. Auto-marks into `internal_transfers`.
- */
-function runPass1(
-  db: AppDatabase,
-  newTxIds: string[],
-  accountIndex: AccountIndex,
-  now: string,
-): RunPass1Result {
-  if (newTxIds.length === 0) return { marked: 0, matchedTxIds: new Set() };
-  const candidates = db
-    .select()
-    .from(transactionsTable)
-    .where(inArray(transactionsTable.id, newTxIds))
-    .all() as DbTransaction[];
-
-  let marked = 0;
-  const matchedTxIds = new Set<string>();
-
-  for (const tx of candidates) {
-    if (matchedTxIds.has(tx.id)) continue;
-    if (!TRANSFER_TYPES.has(tx.type)) continue;
-    if (!tx.metaOtherAccount) continue;
-
-    const otherAccount = accountIndex.byFormatted.get(tx.metaOtherAccount);
-    if (!otherAccount) continue;
-    if (otherAccount._id === tx.accountId) continue;
-    if (isAlreadyMarkedInternal(db, tx.id)) continue;
-
-    // Find opposite-sign counterpart in that account.
-    const counterpart = db
-      .select()
-      .from(transactionsTable)
-      .where(
-        and(
-          eq(transactionsTable.accountId, otherAccount._id),
-          eq(transactionsTable.amount, -tx.amount),
-        ),
-      )
-      .all()
-      .find(
-        (c) =>
-          !matchedTxIds.has(c.id) &&
-          Math.abs(new Date(c.date).getTime() - new Date(tx.date).getTime()) <=
-            PASS2_WINDOW_MS &&
-          !isAlreadyMarkedInternal(db, c.id),
-      );
-
-    const debit = tx.amount < 0 ? tx : counterpart;
-    const credit = tx.amount < 0 ? counterpart : tx;
-
-    if (!debit) continue;
-
-    const insert: NewInternalTransfer = {
-      id: newTransferId(),
-      debitTransactionId: debit.id,
-      creditTransactionId: credit?.id ?? null,
-      detectionMethod: counterpart ? "auto_matched" : "auto_other_account",
-      markedAt: now,
-    };
-    try {
-      db.insert(internalTransfers).values(insert).run();
-      marked += 1;
-      matchedTxIds.add(debit.id);
-      if (credit) matchedTxIds.add(credit.id);
-    } catch {
-      // UNIQUE on debit_transaction_id — already marked, skip silently.
-    }
-  }
-
-  return { marked, matchedTxIds };
-}
-
-/**
- * Pass 2 (spec §7): amount + 48h window. Writes pending rows to
- * `internal_transfer_suggestions` for the user to confirm later.
- */
-function runPass2(
-  db: AppDatabase,
-  newTxIds: string[],
-  skipIds: Set<string>,
-  now: string,
-): number {
-  if (newTxIds.length === 0) return 0;
-  const candidates = db
-    .select()
-    .from(transactionsTable)
-    .where(inArray(transactionsTable.id, newTxIds))
-    .all() as DbTransaction[];
-
-  let suggested = 0;
-  const localMatched = new Set<string>();
-
-  for (const tx of candidates) {
-    if (skipIds.has(tx.id) || localMatched.has(tx.id)) continue;
-    if (!TRANSFER_TYPES.has(tx.type)) continue;
-    if (isAlreadyMarkedInternal(db, tx.id)) continue;
-    if (hasPendingSuggestion(db, tx.id)) continue;
-
-    // Find candidate counterpart anywhere in DB with opposite sign and 48h window.
-    const others = db
-      .select()
-      .from(transactionsTable)
-      .where(
-        and(
-          eq(transactionsTable.amount, -tx.amount),
-          sql`${transactionsTable.accountId} != ${tx.accountId}`,
-        ),
-      )
-      .all() as DbTransaction[];
-
-    const counterpart = others.find(
-      (c) =>
-        !skipIds.has(c.id) &&
-        !localMatched.has(c.id) &&
-        TRANSFER_TYPES.has(c.type) &&
-        Math.abs(new Date(c.date).getTime() - new Date(tx.date).getTime()) <=
-          PASS2_WINDOW_MS &&
-        !isAlreadyMarkedInternal(db, c.id) &&
-        !hasPendingSuggestion(db, c.id),
-    );
-
-    if (!counterpart) continue;
-
-    const debit = tx.amount < 0 ? tx : counterpart;
-    const credit = tx.amount < 0 ? counterpart : tx;
-
-    const insert: NewInternalTransferSuggestion = {
-      id: newSuggestionId(),
-      debitTransactionId: debit.id,
-      creditTransactionId: credit.id,
-      detectionMethod: "amount_window",
-      confidence: "medium",
-      suggestedAt: now,
-      status: "pending",
-    };
-    try {
-      db.insert(internalTransferSuggestions).values(insert).run();
-      suggested += 1;
-      localMatched.add(debit.id);
-      localMatched.add(credit.id);
-    } catch {
-      // UNIQUE(debit, credit) — already a suggestion, skip.
-    }
-  }
-
-  return suggested;
+function akahuAccountIndex(accounts: Account[]): AccountIndex {
+  return buildAccountIndex(
+    accounts.map((acc) => ({
+      id: acc._id,
+      formattedAccount: acc.formatted_account ?? null,
+    })),
+  );
 }
 
 /**
@@ -505,7 +313,7 @@ export async function runSync(options: RunSyncOptions): Promise<SyncResult> {
     const txs = await client.listAllTransactions({ start: watermark });
     const { inserted, rowIds } = upsertTransactions(db, txs, startedAt);
 
-    const accountIndex = indexAccounts(accountsList);
+    const accountIndex = akahuAccountIndex(accountsList);
     const pass1 = runPass1(db, rowIds, accountIndex, startedAt);
     const transfersSuggested = runPass2(
       db,
