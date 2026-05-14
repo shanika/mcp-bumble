@@ -24,6 +24,12 @@ export default [
         process: "readonly",
         console: "readonly",
         Buffer: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        structuredClone: "readonly",
+        NodeJS: "readonly",
       },
     },
     plugins: {

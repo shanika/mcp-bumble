@@ -279,11 +279,7 @@ describe("markInternalTransfer", () => {
       })
       .run();
 
-    const result = markInternalTransfer(
-      db,
-      { transferPairs: ["sugg_1"] },
-      now,
-    );
+    const result = markInternalTransfer(db, { transferPairs: ["sugg_1"] }, now);
     expect(result).toEqual({ marked: 1 });
 
     const transfers = db.select().from(internalTransfers).all();
@@ -458,9 +454,9 @@ describe("unmarkInternalTransfer", () => {
   afterEach(() => disposeTestDatabase(db));
 
   it("throws on an empty transactionIds array", () => {
-    expect(() =>
-      unmarkInternalTransfer(db, { transactionIds: [] }),
-    ).toThrow(/non-empty/);
+    expect(() => unmarkInternalTransfer(db, { transactionIds: [] })).toThrow(
+      /non-empty/,
+    );
   });
 
   it("removes auto-marked rows touching either debit or credit leg", () => {
@@ -486,9 +482,9 @@ describe("unmarkInternalTransfer", () => {
       })
       .run();
 
-    expect(
-      unmarkInternalTransfer(db, { transactionIds: ["c"] }),
-    ).toEqual({ unmarked: 1 });
+    expect(unmarkInternalTransfer(db, { transactionIds: ["c"] })).toEqual({
+      unmarked: 1,
+    });
     expect(db.select().from(internalTransfers).all()).toHaveLength(0);
   });
 
@@ -524,8 +520,8 @@ describe("unmarkInternalTransfer", () => {
   });
 
   it("is a no-op count when nothing matches", () => {
-    expect(
-      unmarkInternalTransfer(db, { transactionIds: ["nope"] }),
-    ).toEqual({ unmarked: 0 });
+    expect(unmarkInternalTransfer(db, { transactionIds: ["nope"] })).toEqual({
+      unmarked: 0,
+    });
   });
 });

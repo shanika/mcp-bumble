@@ -20,6 +20,7 @@ export default defineConfig({
         "src/lib/rules.ts",
         "src/tools/categories.ts",
         "src/tools/rules.ts",
+        "src/transport/stdio.ts",
       ],
       thresholds: {
         lines: 80,

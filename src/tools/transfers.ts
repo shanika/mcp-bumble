@@ -86,9 +86,7 @@ export interface UnmarkInternalTransferResult {
 }
 
 function pendingSuggestionConditions(args: DetectInternalTransfersArgs): SQL[] {
-  const conditions: SQL[] = [
-    eq(internalTransferSuggestions.status, "pending"),
-  ];
+  const conditions: SQL[] = [eq(internalTransferSuggestions.status, "pending")];
   if (args.start) {
     conditions.push(gte(internalTransferSuggestions.suggestedAt, args.start));
   }
@@ -144,9 +142,9 @@ export function detectInternalTransfers(
 
   const creditDates = creditDateLookup(
     db,
-    suggestionRows.map((r) => r.creditTransactionId).filter((id): id is string =>
-      Boolean(id),
-    ),
+    suggestionRows
+      .map((r) => r.creditTransactionId)
+      .filter((id): id is string => Boolean(id)),
   );
 
   const pairs: TransferPair[] = suggestionRows.map((row) => ({
@@ -166,10 +164,7 @@ export function detectInternalTransfers(
   return { pairs };
 }
 
-function creditDateLookup(
-  db: AppDatabase,
-  ids: string[],
-): Map<string, string> {
+function creditDateLookup(db: AppDatabase, ids: string[]): Map<string, string> {
   if (ids.length === 0) return new Map();
   const rows = db
     .select({ id: transactionsTable.id, date: transactionsTable.date })
@@ -346,10 +341,7 @@ export function unmarkInternalTransfer(
     .where(
       or(
         inArray(internalTransfers.debitTransactionId, args.transactionIds),
-        inArray(
-          internalTransfers.creditTransactionId,
-          args.transactionIds,
-        ),
+        inArray(internalTransfers.creditTransactionId, args.transactionIds),
       ) as SQL,
     )
     .run();
