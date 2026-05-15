@@ -18,7 +18,8 @@ import {
 export interface AkahuLike {
   accounts: {
     list(userToken: string): Promise<Account[]>;
-    refresh?(userToken: string, accountId: string): Promise<void>;
+    refresh(userToken: string, accountId: string): Promise<void>;
+    refreshAll(userToken: string): Promise<void>;
   };
   transactions: {
     list(
@@ -136,4 +137,33 @@ export class BumbleAkahuClient {
     this.accountsCache.clear();
     this.balancesCache.clear();
   }
+
+  /**
+   * Asks Akahu to repull data from the bank. Subject to Akahu's 15-minute
+   * per-account cooldown — callers should expect a 429 (`AkahuErrorResponse`
+   * with `status: 429`) when invoked too soon after the previous refresh.
+   * Pass `accountId` to refresh a single account, or omit to refresh every
+   * account linked to this user token.
+   */
+  async refresh(options: { accountId?: string } = {}): Promise<void> {
+    if (options.accountId) {
+      await this.client.accounts.refresh(this.userToken, options.accountId);
+    } else {
+      await this.client.accounts.refreshAll(this.userToken);
+    }
+  }
+}
+
+/**
+ * Builds a `BumbleAkahuClient` from environment variables, or returns
+ * `undefined` when either token is missing. Used by the MCP transports so the
+ * server can boot for read-only use without Akahu credentials.
+ */
+export function buildAkahuClientFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): BumbleAkahuClient | undefined {
+  const appToken = env.AKAHU_APP_TOKEN;
+  const userToken = env.AKAHU_USER_TOKEN;
+  if (!appToken || !userToken) return undefined;
+  return new BumbleAkahuClient({ credentials: { appToken, userToken } });
 }

@@ -8,7 +8,7 @@ Bumble is a self-hostable [Model Context Protocol](https://modelcontextprotocol.
 
 ## What works in v1
 
-Sixteen tools across five groups, all exercised by unit and MCP-SDK integration tests:
+Eighteen tools across six groups, all exercised by unit and MCP-SDK integration tests:
 
 | Group              | Tools                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -17,8 +17,11 @@ Sixteen tools across five groups, all exercised by unit and MCP-SDK integration 
 | Categorization     | `categorize_transactions`, `list_categories`, `create_category`, `rename_category`, `delete_category`        |
 | Rules              | `list_rules`, `delete_rule` (vendor→category rules are learned automatically when you categorise)            |
 | Internal transfers | `detect_internal_transfers`, `mark_internal_transfer`, `list_internal_transfers`, `unmark_internal_transfer` |
+| Sync               | `refresh`, `sync`                                                                                            |
 
-Plus a `bumble sync` CLI that pulls the latest day of transactions from Akahu, applies vendor rules, and auto-marks high-confidence internal transfer pairs. Designed to run nightly via cron.
+Plus a `bumble sync` / `bumble refresh` CLI that pulls the latest day of transactions from Akahu, applies vendor rules, and auto-marks high-confidence internal transfer pairs. Designed to run nightly via cron.
+
+**On-demand refresh + sync.** `refresh` asks Akahu to repull data from the bank (subject to a 15-minute cooldown — returns `{ status: "cooldown", cooldownRemaining }` instead of throwing when throttled). `sync` runs the same pipeline as `bumble sync --now` and returns the one-screen summary (`imported`, `autoMarkedTransfers`, `pendingSuggestions`, `autoCategorised`, `residualUncategorised`). Both are no-ops when `AKAHU_APP_TOKEN` / `AKAHU_USER_TOKEN` aren't set on the server process — the read-only tools keep working.
 
 **Categorisation flow.** When you ask Claude to categorise an uncategorised transaction, Bumble proposes a category — either the Akahu NZFCC hint or a learned vendor rule. You can accept it or override; Bumble upserts the category by name and records a vendor→category rule so the next matching transaction is auto-categorised.
 
@@ -46,7 +49,7 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (m
 }
 ```
 
-Restart Claude Desktop. The `bumble` server should appear in the MCP indicator with 16 tools available.
+Restart Claude Desktop. The `bumble` server should appear in the MCP indicator with 18 tools available.
 
 Get Akahu tokens from <https://my.akahu.nz/developers> — you need both the App token (per-app) and a User token (per-user, scoped to your accounts).
 
@@ -58,6 +61,9 @@ AKAHU_APP_TOKEN=… AKAHU_USER_TOKEN=… npx -y mcp-bumble
 
 # One-shot sync
 AKAHU_APP_TOKEN=… AKAHU_USER_TOKEN=… npx -y mcp-bumble sync --now
+
+# Ask Akahu to repull from the banks (15-min cooldown)
+AKAHU_APP_TOKEN=… AKAHU_USER_TOKEN=… npx -y mcp-bumble refresh
 ```
 
 ### Docker

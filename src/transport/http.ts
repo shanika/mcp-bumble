@@ -13,6 +13,8 @@ import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
+import { buildAkahuClientFromEnv } from "../akahu/client.js";
+import type { BumbleAkahuClient } from "../akahu/client.js";
 import { closeDatabase, openDatabase } from "../db/index.js";
 import type { AppDatabase } from "../db/index.js";
 import { BumbleOAuthProvider } from "../oauth/provider.js";
@@ -82,9 +84,14 @@ export function parseHttpConfigFromEnv(
 export function createHttpApp(
   config: HttpTransportConfig,
   db: AppDatabase,
+  akahuClient?: BumbleAkahuClient,
 ): { app: express.Express; close: () => void } {
   const issuerUrl = new URL(config.issuer);
-  const resource = config.issuer.replace(/\/$/, "");
+  // The MCP endpoint is the protected resource. Per RFC 9728, the WWW-Authenticate
+  // `resource_metadata` URL must match where PRM is actually served. We compute
+  // both from the same `mcpServerUrl` so they stay aligned.
+  const mcpServerUrl = new URL("/mcp", config.issuer);
+  const resource = mcpServerUrl.href;
 
   const store = new OAuthStore({
     ...(config.oauthDataFile !== undefined
@@ -103,17 +110,36 @@ export function createHttpApp(
   if (config.allowedHosts) appOptions.allowedHosts = config.allowedHosts;
   const app = createMcpExpressApp(appOptions);
 
+  // Behind cloudflared on loopback — needed so express-rate-limit keys by the
+  // real client IP from X-Forwarded-For instead of bucketing every request
+  // under 127.0.0.1 (which trips the registration rate limit during testing).
+  app.set("trust proxy", "loopback");
+
+  // Lightweight request log: method, path, status, ms. Used to diagnose
+  // remote OAuth client failures where the ofid_… reference is opaque.
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `${req.method} ${req.originalUrl} → ${res.statusCode} ${Date.now() - start}ms ua="${req.headers["user-agent"] ?? ""}"`,
+      );
+    });
+    next();
+  });
+
   // Body parsing for non-MCP routes (the OAuth router mounts its own parsers
   // per-handler, but consent POST + introspection style handlers need urlencoded).
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
   // OAuth endpoints: /register, /authorize, /token, /revoke,
-  // /.well-known/oauth-authorization-server, /.well-known/oauth-protected-resource.
+  // /.well-known/oauth-authorization-server, /.well-known/oauth-protected-resource/mcp.
   app.use(
     mcpAuthRouter({
       provider,
       issuerUrl,
+      resourceServerUrl: mcpServerUrl,
       scopesSupported: ["mcp"],
       resourceName: "Bumble MCP",
     }),
@@ -122,7 +148,6 @@ export function createHttpApp(
   // Per-session transport map.
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
-  const mcpServerUrl = new URL("/mcp", config.issuer);
   const authMiddleware = requireBearerAuth({
     verifier: provider,
     requiredScopes: ["mcp"],
@@ -147,7 +172,10 @@ export function createHttpApp(
           const sid = transport!.sessionId;
           if (sid) transports.delete(sid);
         };
-        const server = createServer(db);
+        const server = createServer(
+          db,
+          akahuClient ? { akahuClient } : {},
+        );
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
         return;
@@ -218,7 +246,8 @@ export async function runHttp(
 ): Promise<RunningHttpTransport> {
   const opener = config.openDatabase ?? openDatabase;
   const db = opener({ url: process.env.DB_PATH });
-  const { app, close: closeApp } = createHttpApp(config, db);
+  const akahuClient = buildAkahuClientFromEnv();
+  const { app, close: closeApp } = createHttpApp(config, db, akahuClient);
 
   const server = await new Promise<HttpServer>((resolve, reject) => {
     const s = app.listen(config.port, (err?: Error) => {
