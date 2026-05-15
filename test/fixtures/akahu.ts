@@ -111,6 +111,8 @@ export interface StubAkahu extends AkahuLike {
   calls: {
     accounts: number;
     transactions: TransactionQueryParams[];
+    refresh: { accountId: string }[];
+    refreshAll: number;
   };
 }
 
@@ -122,13 +124,24 @@ export function createStubAkahu(opts: StubAkahuOptions = {}): StubAkahu {
     cursor: { next: idx === arr.length - 1 ? null : `cursor_${idx + 1}` },
   })) as Paginated<Transaction>[];
 
-  const calls = { accounts: 0, transactions: [] as TransactionQueryParams[] };
+  const calls = {
+    accounts: 0,
+    transactions: [] as TransactionQueryParams[],
+    refresh: [] as { accountId: string }[],
+    refreshAll: 0,
+  };
 
   return {
     accounts: {
       list: async (_token: string) => {
         calls.accounts += 1;
         return accounts;
+      },
+      refresh: async (_token: string, accountId: string) => {
+        calls.refresh.push({ accountId });
+      },
+      refreshAll: async (_token: string) => {
+        calls.refreshAll += 1;
       },
     },
     transactions: {

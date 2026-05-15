@@ -10,6 +10,7 @@ import type { AppDatabase } from "../../src/db/index.js";
 import { createTestDatabase, disposeTestDatabase } from "../db/setup.js";
 
 const ISSUER = "http://127.0.0.1/";
+const RESOURCE = "http://127.0.0.1/mcp";
 const ADMIN_PASSWORD = "letmein";
 
 function base64url(buf: Buffer): string {
@@ -91,7 +92,7 @@ async function obtainCode(
     code_challenge_method: "S256",
     scope: "mcp",
     state: "xyz",
-    resource: ISSUER,
+    resource: RESOURCE,
     password: ADMIN_PASSWORD,
   });
   const res = await fetch(url, {
@@ -112,7 +113,7 @@ async function exchangeCode(
   clientId: string,
   code: string,
   verifier: string,
-  resource: string = ISSUER,
+  resource: string = RESOURCE,
 ): Promise<Response> {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -207,13 +208,15 @@ describe("HTTP transport (live server)", () => {
     expect(meta.scopes_supported).toContain("mcp");
   });
 
-  it("serves /.well-known/oauth-protected-resource", async () => {
+  it("serves PRM at the /mcp path-specific URL with resource set to .../mcp", async () => {
+    // RFC 9728: PRM is mounted at /.well-known/oauth-protected-resource<rsPath>
     const res = await fetch(
-      `${h.baseUrl}/.well-known/oauth-protected-resource`,
+      `${h.baseUrl}/.well-known/oauth-protected-resource/mcp`,
     );
     expect(res.status).toBe(200);
     const meta = (await res.json()) as Record<string, unknown>;
-    expect(meta.resource).toBeTruthy();
+    expect(meta.resource).toBe(RESOURCE);
+    expect(meta.authorization_servers).toEqual([ISSUER]);
     expect(meta.scopes_supported).toEqual(["mcp"]);
   });
 
@@ -232,7 +235,7 @@ describe("HTTP transport (live server)", () => {
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("scope", "mcp");
-    url.searchParams.set("resource", ISSUER);
+    url.searchParams.set("resource", RESOURCE);
     const res = await fetch(url);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/text\/html/);
@@ -240,7 +243,7 @@ describe("HTTP transport (live server)", () => {
     expect(html).toContain("Authorize Bumble");
   });
 
-  it("requires a Bearer token on /mcp (no auth → 401 with WWW-Authenticate)", async () => {
+  it("requires a Bearer token on /mcp (no auth → 401 with WWW-Authenticate that points at a real PRM URL)", async () => {
     const res = await fetch(`${h.baseUrl}/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -249,7 +252,18 @@ describe("HTTP transport (live server)", () => {
     expect(res.status).toBe(401);
     const www = res.headers.get("www-authenticate") ?? "";
     expect(www).toMatch(/Bearer/);
-    expect(www).toMatch(/resource_metadata=/);
+    // Regression guard for FAM-266: resource_metadata must point to a URL
+    // that actually serves the PRM. Previously it advertised
+    // /.well-known/oauth-protected-resource/mcp but the PRM was only at
+    // /.well-known/oauth-protected-resource — Claude's connector flow followed
+    // the dead URL and failed with ofid_…
+    const match = www.match(/resource_metadata="([^"]+)"/);
+    expect(match).toBeTruthy();
+    // The hinted PRM URL is built from the configured issuer (no test port), so
+    // we re-host it against the test server before fetching.
+    const hinted = new URL(match![1]!);
+    const prm = await fetch(`${h.baseUrl}${hinted.pathname}`);
+    expect(prm.status).toBe(200);
   });
 
   it("rejects an invalid Bearer token with 401", async () => {
@@ -374,7 +388,7 @@ describe("HTTP transport (live server)", () => {
         grant_type: "refresh_token",
         refresh_token: tokens.refresh_token,
         client_id,
-        resource: ISSUER,
+        resource: RESOURCE,
       }).toString(),
     });
     expect(refreshRes.status).toBe(200);
@@ -393,7 +407,7 @@ describe("HTTP transport (live server)", () => {
         grant_type: "refresh_token",
         refresh_token: tokens.refresh_token,
         client_id,
-        resource: ISSUER,
+        resource: RESOURCE,
       }).toString(),
     });
     expect(replay.status).toBe(400);

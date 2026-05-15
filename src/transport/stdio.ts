@@ -1,12 +1,17 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { buildAkahuClientFromEnv } from "../akahu/client.js";
 import { closeDatabase, openDatabase } from "../db/index.js";
 import { createServer } from "../server.js";
 
 /** Boots the MCP server over STDIO. Used by `npx mcp-bumble` / Claude Desktop. */
 export async function runStdio(): Promise<void> {
   const db = openDatabase({ url: process.env.DB_PATH });
-  const server = createServer(db);
+  const akahuClient = buildAkahuClientFromEnv();
+  const server = createServer(
+    db,
+    akahuClient ? { akahuClient } : {},
+  );
   const transport = new StdioServerTransport();
 
   const close = (): void => {

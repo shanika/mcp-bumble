@@ -1,6 +1,7 @@
 import { closeDatabase, openDatabase } from "./db/index.js";
 import { BumbleAkahuClient } from "./akahu/client.js";
 import { runSync, type SyncResult } from "./akahu/sync.js";
+import { refreshAccounts } from "./tools/sync.js";
 
 export interface CliEnv {
   AKAHU_APP_TOKEN?: string;
@@ -18,17 +19,30 @@ export interface CliDeps {
   createClient?: (env: CliEnv) => BumbleAkahuClient;
   /** Override the sync runner (used by tests). */
   runSync?: typeof runSync;
+  /** Override the refresh wrapper (used by tests). */
+  refreshAccounts?: typeof refreshAccounts;
 }
 
 export interface ParsedArgs {
-  command: "sync" | "help";
+  command: "sync" | "refresh" | "help";
   immediate: boolean;
+  accountId?: string;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const [command, ...rest] = argv;
   if (command === "sync") {
     return { command: "sync", immediate: rest.includes("--now") };
+  }
+  if (command === "refresh") {
+    const accountFlagIdx = rest.findIndex((arg) => arg === "--account");
+    const accountId =
+      accountFlagIdx >= 0 ? rest[accountFlagIdx + 1] : undefined;
+    return {
+      command: "refresh",
+      immediate: false,
+      ...(accountId ? { accountId } : {}),
+    };
   }
   return { command: "help", immediate: false };
 }
@@ -55,6 +69,19 @@ function formatSummary(result: SyncResult): string {
   return lines.join("\n");
 }
 
+function formatRefresh(
+  status: "ok" | "cooldown",
+  cooldownRemaining: number | undefined,
+  accountId: string | undefined,
+): string {
+  const target = accountId ? `account ${accountId}` : "all accounts";
+  if (status === "ok") return `refresh ok (${target})`;
+  if (cooldownRemaining !== undefined) {
+    return `refresh cooldown (${target}) — ${cooldownRemaining}s remaining`;
+  }
+  return `refresh cooldown (${target})`;
+}
+
 export async function runCli(
   argv: string[],
   deps: CliDeps = {},
@@ -64,11 +91,13 @@ export async function runCli(
   const stderr = deps.stderr ?? ((line) => console.error(line));
   const opener = deps.openDatabase ?? openDatabase;
   const sync = deps.runSync ?? runSync;
+  const refresh = deps.refreshAccounts ?? refreshAccounts;
 
   const parsed = parseArgs(argv);
 
   if (parsed.command === "help") {
     stdout("Usage: bumble sync [--now]");
+    stdout("       bumble refresh [--account <accountId>]");
     return 0;
   }
 
@@ -86,6 +115,22 @@ export async function runCli(
   } catch (err) {
     stderr((err as Error).message);
     return 2;
+  }
+
+  if (parsed.command === "refresh") {
+    try {
+      const result = await refresh(
+        client,
+        parsed.accountId ? { accountId: parsed.accountId } : {},
+      );
+      stdout(
+        formatRefresh(result.status, result.cooldownRemaining, parsed.accountId),
+      );
+      return 0;
+    } catch (err) {
+      stderr(`refresh failed: ${(err as Error).message}`);
+      return 1;
+    }
   }
 
   const db = opener({ url: env.DB_PATH });
